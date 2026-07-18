@@ -1,0 +1,9 @@
+{
+  "network": "studionet",
+  "chainId": 61999,
+  "rpc": "https://studio.genlayer.com/api",
+  "explorer": "https://explorer-studio.genlayer.com",
+  "contract": "0x0CCd6A72Eb61B0ABFaB10f82d36bF793C3B0FF5e",
+  "deployedAt": "2026-07-18T00:00:00.000Z",
+  "deployer": "user-studio-account"
+}

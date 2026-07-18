@@ -1,0 +1,7 @@
+.genlayer-keys.json
+.env.local
+node_modules/
+.next/
+__pycache__/
+tsconfig.tsbuildinfo
+studionet-test-run.txt

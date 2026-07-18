@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   Ordin design tokens — forensic case room / legal archive.
+   Warm ivory paper, ink black, oxblood accent, muted brass secondary.
+   ------------------------------------------------------------------ */
+@theme {
+  --color-paper: #f6f2ea;
+  --color-paper-deep: #efe9dd;
+  --color-card: #fbf8f2;
+  --color-ink: #1a1713;
+  --color-ink-soft: #4a443b;
+  --color-ink-faint: #837b6e;
+  --color-rule: #d8d0c0;
+  --color-rule-strong: #b3a894;
+  --color-oxblood: #6d1f24;
+  --color-oxblood-deep: #521619;
+  --color-brass: #8c6d2f;
+  --color-emerald-seal: #1d4d3b;
+  --color-verdict-pass: #1d4d3b;
+  --color-verdict-fail: #6d1f24;
+  --color-verdict-wait: #8c6d2f;
+
+  --font-display: "Georgia", "Times New Roman", serif;
+  --font-body: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "Consolas", monospace;
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono-ev {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  letter-spacing: 0.01em;
+}
+
+/* strong editorial rules */
+.rule-top {
+  border-top: 2px solid var(--color-ink);
+}
+.rule-mid {
+  border-top: 1px solid var(--color-rule);
+}
+
+/* status seal — resolves into place */
+.seal {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1.5px solid currentColor;
+  padding: 0.3rem 0.85rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  animation: seal-in 0.35s ease-out;
+}
+@keyframes seal-in {
+  from {
+    transform: scale(1.12);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* line-by-line fetch log */
+.fetch-line {
+  animation: fetch-in 0.3s ease-out both;
+}
+@keyframes fetch-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* timeline entries appear sequentially */
+.timeline-entry {
+  animation: fetch-in 0.35s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seal,
+  .fetch-line,
+  .timeline-entry {
+    animation: none;
+  }
+}
