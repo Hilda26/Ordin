@@ -11,7 +11,7 @@ import {
   getSubmission,
 } from "@/lib/genlayer/reads";
 import { submitResolverRuling, type TxProgress } from "@/lib/genlayer/writes";
-import { getSessionAddress } from "@/lib/genlayer/client";
+import { getConnectedAddress } from "@/lib/genlayer/client";
 import type {
   Bounty,
   BountyPolicy,
@@ -78,7 +78,7 @@ export default function ResolverCaseRoom({ params }: { params: Promise<{ id: str
 
   useEffect(() => {
     load();
-    setMe(getSessionAddress().toLowerCase());
+    setMe(getConnectedAddress()?.toLowerCase() ?? "");
   }, [load]);
 
   if (error) return <CaseErrorState message={error} onRetry={load} />;

@@ -1,38 +1,17 @@
 "use client";
 
 // GenLayer client management for the browser.
-//
-// Two account modes:
-//  - session key: a locally generated private key kept in localStorage.
-//    StudioNet is gasless, so this gives a frictionless flow.
-//  - external wallet (MetaMask-compatible) via window.ethereum.
-import { createClient, createAccount, generatePrivateKey } from "genlayer-js";
+// Wallet-first: users connect MetaMask or a compatible wallet.
+// No auto-generated keys — all on-chain actions require a connected wallet.
+import { createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
-import type { GenLayerClient, GenLayerChain, Account } from "genlayer-js/types";
+import type { GenLayerClient, GenLayerChain } from "genlayer-js/types";
 
-const KEY_STORAGE = "ordin.sessionKey.v1";
-const MODE_STORAGE = "ordin.walletMode.v1";
-
-export type WalletMode = "session" | "external";
+const ADDR_STORAGE = "ordin.walletAddress.v1";
 
 let cachedRead: GenLayerClient<GenLayerChain> | null = null;
 let cachedWrite: GenLayerClient<GenLayerChain> | null = null;
-let cachedAccount: Account | null = null;
-let cachedExternalAddress: string | null = null;
-let currentMode: WalletMode = "session";
-
-function loadMode(): WalletMode {
-  try {
-    const stored = window.localStorage.getItem(MODE_STORAGE);
-    if (stored === "external") return "external";
-  } catch {}
-  return "session";
-}
-
-export function getWalletMode(): WalletMode {
-  currentMode = loadMode();
-  return currentMode;
-}
+let connectedAddress: string | null = null;
 
 export function getReadClient(): GenLayerClient<GenLayerChain> {
   if (!cachedRead) {
@@ -41,69 +20,34 @@ export function getReadClient(): GenLayerClient<GenLayerChain> {
   return cachedRead;
 }
 
-export function getSessionAccount(): Account {
-  if (cachedAccount) return cachedAccount;
-  let pk = null;
+export function getConnectedAddress(): string | null {
+  if (connectedAddress) return connectedAddress;
   try {
-    pk = window.localStorage.getItem(KEY_STORAGE);
-  } catch {}
-  if (!pk) {
-    pk = generatePrivateKey();
-    try {
-      window.localStorage.setItem(KEY_STORAGE, pk);
-    } catch {}
+    return window.localStorage.getItem(ADDR_STORAGE);
+  } catch {
+    return null;
   }
-  cachedAccount = createAccount(pk as `0x${string}`);
-  return cachedAccount;
 }
 
-export function getWriteClient(): {
-  client: GenLayerClient<GenLayerChain>;
-  account: Account;
-} {
-  const mode = getWalletMode();
-  if (mode === "external" && cachedWrite && cachedAccount) {
-    return { client: cachedWrite, account: cachedAccount };
-  }
-  const account = getSessionAccount();
-  if (!cachedWrite) {
-    cachedWrite = createClient({ chain: studionet, account });
-  }
-  return { client: cachedWrite, account };
-}
-
-export function getSessionAddress(): string {
-  const mode = getWalletMode();
-  if (mode === "external" && cachedExternalAddress) {
-    return cachedExternalAddress;
-  }
-  return getSessionAccount().address ?? "";
-}
-
-export function resetSessionKey(): string {
-  try {
-    window.localStorage.removeItem(KEY_STORAGE);
-  } catch {}
-  cachedAccount = null;
-  cachedWrite = null;
-  return getSessionAddress();
+export function isWalletConnected(): boolean {
+  return !!getConnectedAddress();
 }
 
 export function hasExternalWallet(): boolean {
   return typeof window !== "undefined" && !!(window as any).ethereum;
 }
 
-export async function connectExternalWallet(): Promise<string> {
+export async function connectWallet(): Promise<string> {
   const ethereum = (window as any).ethereum;
-  if (!ethereum) throw new Error("No wallet detected");
+  if (!ethereum) throw new Error("No wallet detected. Install MetaMask to continue.");
 
   const accounts: string[] = await ethereum.request({
     method: "eth_requestAccounts",
   });
-  if (!accounts.length) throw new Error("No accounts returned");
+  if (!accounts.length) throw new Error("No accounts returned by wallet");
 
   const address = accounts[0];
-  cachedExternalAddress = address;
+  connectedAddress = address;
 
   cachedWrite = createClient({
     chain: studionet,
@@ -111,18 +55,49 @@ export async function connectExternalWallet(): Promise<string> {
   });
 
   try {
-    window.localStorage.setItem(MODE_STORAGE, "external");
+    window.localStorage.setItem(ADDR_STORAGE, address);
   } catch {}
-  currentMode = "external";
 
   return address;
 }
 
+export async function reconnectWallet(): Promise<string | null> {
+  const ethereum = (window as any).ethereum;
+  if (!ethereum) return null;
+  const stored = getConnectedAddress();
+  if (!stored) return null;
+
+  try {
+    const accounts: string[] = await ethereum.request({
+      method: "eth_accounts",
+    });
+    if (accounts.length && accounts[0].toLowerCase() === stored.toLowerCase()) {
+      connectedAddress = accounts[0];
+      cachedWrite = createClient({
+        chain: studionet,
+        provider: ethereum,
+      });
+      return accounts[0];
+    }
+  } catch {}
+
+  disconnectWallet();
+  return null;
+}
+
+export function getWriteClient(): {
+  client: GenLayerClient<GenLayerChain>;
+} {
+  if (!cachedWrite) {
+    throw new Error("Wallet not connected. Connect your wallet first.");
+  }
+  return { client: cachedWrite };
+}
+
 export function disconnectWallet(): void {
   try {
-    window.localStorage.removeItem(MODE_STORAGE);
+    window.localStorage.removeItem(ADDR_STORAGE);
   } catch {}
-  currentMode = "session";
-  cachedExternalAddress = null;
+  connectedAddress = null;
   cachedWrite = null;
 }

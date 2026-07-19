@@ -35,13 +35,12 @@ async function doWrite(
   args: CalldataEncodable[],
   onProgress?: ProgressFn
 ): Promise<{ hash: string }> {
-  const { client, account } = getWriteClient();
+  const { client } = getWriteClient();
   onProgress?.({ phase: "awaiting-wallet" });
   let hash: string;
   try {
     onProgress?.({ phase: "submitting" });
     hash = (await client.writeContract({
-      account,
       address: ORDIN_CONTRACT_ADDRESS,
       functionName,
       args,

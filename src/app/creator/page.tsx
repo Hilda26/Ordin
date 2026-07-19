@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getBounty, getCreatorBounties, getSubmission } from "@/lib/genlayer/reads";
-import { getSessionAddress } from "@/lib/genlayer/client";
+import { getConnectedAddress } from "@/lib/genlayer/client";
 import type { Bounty, Submission } from "@/types/ordin";
 import { formatReward, shortAddress } from "@/lib/format";
 import { StatusSeal } from "@/components/StatusSeal";
@@ -17,7 +17,7 @@ export default function CreatorOverview() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const a = getSessionAddress();
+    const a = getConnectedAddress() ?? "";
     setAddr(a);
     (async () => {
       try {

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { use, useCallback, useEffect, useState } from "react";
 import { getBounty, getBountyPolicy } from "@/lib/genlayer/reads";
 import { openBounty, cancelBounty, claimRefund, type TxProgress } from "@/lib/genlayer/writes";
-import { getSessionAddress } from "@/lib/genlayer/client";
+import { getConnectedAddress } from "@/lib/genlayer/client";
 import type { Bounty, BountyPolicy } from "@/types/ordin";
 import { formatBps, formatDate, formatReward, shortAddress } from "@/lib/format";
 import { CaseHeader } from "@/components/CaseHeader";
@@ -35,7 +35,7 @@ export default function BountyDetail({ params }: { params: Promise<{ id: string 
 
   useEffect(() => {
     load();
-    setMe(getSessionAddress().toLowerCase());
+    setMe(getConnectedAddress()?.toLowerCase() ?? "");
   }, [load]);
 
   if (error) return <CaseErrorState message={error} onRetry={load} />;

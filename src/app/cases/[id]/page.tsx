@@ -23,7 +23,7 @@ import {
   submitRevision,
   type TxProgress,
 } from "@/lib/genlayer/writes";
-import { getSessionAddress } from "@/lib/genlayer/client";
+import { getConnectedAddress } from "@/lib/genlayer/client";
 import type {
   Appeal,
   Bounty,
@@ -101,7 +101,7 @@ export default function CaseFile({ params }: { params: Promise<{ id: string }> }
 
   useEffect(() => {
     load();
-    setMe(getSessionAddress().toLowerCase());
+    setMe(getConnectedAddress()?.toLowerCase() ?? "");
   }, [load]);
 
   if (error) return <CaseErrorState message={error} onRetry={load} />;

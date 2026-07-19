@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getResolverCases, getSubmission, getBounty } from "@/lib/genlayer/reads";
-import { getSessionAddress } from "@/lib/genlayer/client";
+import { getConnectedAddress } from "@/lib/genlayer/client";
 import type { Submission } from "@/types/ordin";
 import { shortAddress } from "@/lib/format";
 import { StatusSeal } from "@/components/StatusSeal";
@@ -16,7 +16,7 @@ export default function ResolverQueue() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const a = getSessionAddress();
+    const a = getConnectedAddress() ?? "";
     setAddr(a);
     (async () => {
       try {
