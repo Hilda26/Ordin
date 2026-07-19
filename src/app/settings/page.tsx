@@ -1,8 +1,15 @@
 "use client";
 
-// Settings — session key, wallet identity, ledger balance, account status.
 import { useEffect, useState } from "react";
-import { getSessionAddress, resetSessionKey } from "@/lib/genlayer/client";
+import {
+  getSessionAddress,
+  resetSessionKey,
+  getWalletMode,
+  hasExternalWallet,
+  connectExternalWallet,
+  disconnectWallet,
+  type WalletMode,
+} from "@/lib/genlayer/client";
 import { getLedgerBalance } from "@/lib/genlayer/reads";
 import { isSupabaseConfigured, getSupabase } from "@/lib/supabase/client";
 import { formatReward } from "@/lib/format";
@@ -14,14 +21,44 @@ export default function SettingsPage() {
   const [ledger, setLedger] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [mode, setMode] = useState<WalletMode>("session");
+  const [walletAvailable, setWalletAvailable] = useState(false);
+  const [walletError, setWalletError] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
+    const m = getWalletMode();
+    setMode(m);
+    setWalletAvailable(hasExternalWallet());
     const a = getSessionAddress();
     setAddr(a);
     getLedgerBalance(a).then(setLedger).catch(() => setLedger(null));
     const sb = getSupabase();
     if (sb) sb.auth.getUser().then(({ data }) => setUserEmail(data.user?.email ?? null));
   }, []);
+
+  async function handleConnect() {
+    setConnecting(true);
+    setWalletError(null);
+    try {
+      const address = await connectExternalWallet();
+      setAddr(address);
+      setMode("external");
+      getLedgerBalance(address).then(setLedger).catch(() => setLedger(null));
+    } catch (e: any) {
+      setWalletError(e.message ?? "Connection failed");
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  function handleDisconnect() {
+    disconnectWallet();
+    setMode("session");
+    const a = getSessionAddress();
+    setAddr(a);
+    getLedgerBalance(a).then(setLedger).catch(() => setLedger(null));
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-10">
@@ -31,12 +68,55 @@ export default function SettingsPage() {
       </div>
 
       <section className="space-y-3">
-        <h2 className="font-display text-xl">StudioNet session key</h2>
+        <h2 className="font-display text-xl">Wallet</h2>
         <p className="text-sm text-ink-soft">
-          Your on-chain identity is a locally generated key held in this browser. StudioNet is
-          gasless, so it needs no funds. It signs bounties, submissions, appeals and claims.
+          Choose how to sign on-chain transactions. A session key is auto-generated for
+          frictionless use on StudioNet. Alternatively, connect an external wallet (MetaMask
+          or compatible) to use your own account.
         </p>
-        <p className="font-mono-ev break-all border border-rule bg-card px-4 py-3">{addr || "…"}</p>
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => { disconnectWallet(); setMode("session"); setAddr(getSessionAddress()); }}
+            className={`border px-4 py-2 text-sm ${
+              mode === "session"
+                ? "border-oxblood bg-oxblood text-paper"
+                : "border-ink hover:bg-paper-deep"
+            }`}
+          >
+            Session key
+          </button>
+          <button
+            onClick={handleConnect}
+            disabled={!walletAvailable || connecting}
+            className={`border px-4 py-2 text-sm ${
+              mode === "external"
+                ? "border-oxblood bg-oxblood text-paper"
+                : walletAvailable
+                  ? "border-ink hover:bg-paper-deep"
+                  : "border-rule text-ink-faint cursor-not-allowed"
+            }`}
+          >
+            {connecting ? "Connecting…" : mode === "external" ? "External wallet" : "Connect wallet"}
+          </button>
+        </div>
+
+        {!walletAvailable && mode !== "external" && (
+          <p className="text-xs text-ink-faint">
+            No wallet detected. Install MetaMask or another browser wallet to enable this option.
+          </p>
+        )}
+        {walletError && (
+          <p className="text-xs text-verdict-fail">{walletError}</p>
+        )}
+
+        <p className="font-mono-ev break-all border border-rule bg-card px-4 py-3">
+          {addr || "…"}
+        </p>
+        <p className="text-xs text-ink-faint">
+          {mode === "external" ? "Connected via external wallet" : "StudioNet session key (browser-local)"}
+        </p>
+
         {ledger !== null ? (
           <p className="text-sm">
             Ledger credits recorded to this address:{" "}
@@ -44,7 +124,15 @@ export default function SettingsPage() {
             <span className="text-ink-faint">(on-chain ledger entries, not transferable funds)</span>
           </p>
         ) : null}
-        {!confirmReset ? (
+
+        {mode === "external" ? (
+          <button
+            onClick={handleDisconnect}
+            className="border border-ink px-4 py-2 text-sm hover:bg-paper-deep"
+          >
+            Disconnect wallet
+          </button>
+        ) : !confirmReset ? (
           <button onClick={() => setConfirmReset(true)} className="border border-ink px-4 py-2 text-sm hover:bg-paper-deep">
             Generate a new session key…
           </button>

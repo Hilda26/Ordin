@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getSessionAddress } from "@/lib/genlayer/client";
+import { getSessionAddress, getWalletMode, type WalletMode } from "@/lib/genlayer/client";
 import { shortAddress } from "@/lib/format";
 
 const LINKS = [
@@ -17,8 +17,14 @@ const LINKS = [
 export function TopNav() {
   const pathname = usePathname();
   const [addr, setAddr] = useState("");
+  const [mode, setMode] = useState<WalletMode>("session");
   const [open, setOpen] = useState(false);
-  useEffect(() => setAddr(getSessionAddress()), []);
+  useEffect(() => {
+    setAddr(getSessionAddress());
+    setMode(getWalletMode());
+  }, []);
+
+  const modeLabel = mode === "external" ? "wallet" : "session key";
 
   return (
     <header className="rule-top border-b border-rule bg-paper">
@@ -45,9 +51,13 @@ export function TopNav() {
         </div>
         <div className="flex items-center gap-4">
           {addr ? (
-            <span className="hidden font-mono-ev text-ink-faint sm:inline" title="StudioNet session key">
-              {shortAddress(addr)}
-            </span>
+            <Link
+              href="/settings"
+              className="hidden items-center gap-2 font-mono-ev text-ink-faint hover:text-ink sm:inline-flex"
+              title={`StudioNet ${modeLabel}`}
+            >
+              <span className="text-xs">{shortAddress(addr)}</span>
+            </Link>
           ) : null}
           <button
             className="md:hidden"
