@@ -51,6 +51,7 @@ export async function connectWallet(): Promise<string> {
 
   cachedWrite = createClient({
     chain: studionet,
+    account: address as `0x${string}`,
     provider: ethereum,
   });
 
@@ -75,6 +76,7 @@ export async function reconnectWallet(): Promise<string | null> {
       connectedAddress = accounts[0];
       cachedWrite = createClient({
         chain: studionet,
+        account: accounts[0] as `0x${string}`,
         provider: ethereum,
       });
       return accounts[0];
