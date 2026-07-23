@@ -14,23 +14,42 @@ let cachedRead: GenLayerClient<GenLayerChain> | null = null;
 let cachedWrite: GenLayerClient<GenLayerChain> | null = null;
 let connectedAddress: string | null = null;
 
-function applyStudioNetFeeGuard<T extends GenLayerClient<GenLayerChain>>(client: T): T {
-  const writableClient = client as any as { __ordinFeeGuard?: true; request: (args: any) => Promise<any> };
-  if (writableClient.__ordinFeeGuard) return client;
+type EthereumProvider = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
 
-  const request = writableClient.request.bind(client);
-  writableClient.request = async (args: any) => {
-    const result = await request(args);
-    if (args?.method !== "eth_gasPrice" || typeof result !== "string") return result;
+function ensureNonzeroFee(tx: unknown): unknown {
+  if (!tx || typeof tx !== "object") return tx;
 
-    try {
-      return BigInt(result) === 0n ? STUDIO_MIN_GAS_PRICE_HEX : result;
-    } catch {
-      return result;
-    }
+  const next = { ...(tx as Record<string, unknown>) };
+  const gasPrice = typeof next.gasPrice === "string" ? next.gasPrice : "0x0";
+  try {
+    if (BigInt(gasPrice) > 0n) return next;
+  } catch {
+    return next;
+  }
+
+  next.type = "0x0";
+  next.gasPrice = STUDIO_MIN_GAS_PRICE_HEX;
+  delete next.maxFeePerGas;
+  delete next.maxPriorityFeePerGas;
+  return next;
+}
+
+function withStudioNetFeeGuard(provider: EthereumProvider): EthereumProvider {
+  return {
+    ...provider,
+    request: async (args) => {
+      if (args.method !== "eth_sendTransaction" || !Array.isArray(args.params)) {
+        return provider.request(args);
+      }
+
+      return provider.request({
+        ...args,
+        params: [ensureNonzeroFee(args.params[0]), ...args.params.slice(1)],
+      });
+    },
   };
-  writableClient.__ordinFeeGuard = true;
-  return client;
 }
 
 export function getReadClient(): GenLayerClient<GenLayerChain> {
@@ -69,11 +88,11 @@ export async function connectWallet(): Promise<string> {
   const address = accounts[0];
   connectedAddress = address;
 
-  cachedWrite = applyStudioNetFeeGuard(createClient({
+  cachedWrite = createClient({
     chain: studionet,
     account: address as `0x${string}`,
-    provider: ethereum,
-  }));
+    provider: withStudioNetFeeGuard(ethereum),
+  });
 
   try {
     window.localStorage.setItem(ADDR_STORAGE, address);
@@ -94,11 +113,11 @@ export async function reconnectWallet(): Promise<string | null> {
     });
     if (accounts.length && accounts[0].toLowerCase() === stored.toLowerCase()) {
       connectedAddress = accounts[0];
-      cachedWrite = applyStudioNetFeeGuard(createClient({
+      cachedWrite = createClient({
         chain: studionet,
         account: accounts[0] as `0x${string}`,
-        provider: ethereum,
-      }));
+        provider: withStudioNetFeeGuard(ethereum),
+      });
       return accounts[0];
     }
   } catch {}
