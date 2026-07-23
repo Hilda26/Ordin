@@ -8,10 +8,30 @@ import { studionet } from "genlayer-js/chains";
 import type { GenLayerClient, GenLayerChain } from "genlayer-js/types";
 
 const ADDR_STORAGE = "ordin.walletAddress.v1";
+const STUDIO_MIN_GAS_PRICE_HEX = "0x1";
 
 let cachedRead: GenLayerClient<GenLayerChain> | null = null;
 let cachedWrite: GenLayerClient<GenLayerChain> | null = null;
 let connectedAddress: string | null = null;
+
+function applyStudioNetFeeGuard<T extends GenLayerClient<GenLayerChain>>(client: T): T {
+  const writableClient = client as any as { __ordinFeeGuard?: true; request: (args: any) => Promise<any> };
+  if (writableClient.__ordinFeeGuard) return client;
+
+  const request = writableClient.request.bind(client);
+  writableClient.request = async (args: any) => {
+    const result = await request(args);
+    if (args?.method !== "eth_gasPrice" || typeof result !== "string") return result;
+
+    try {
+      return BigInt(result) === 0n ? STUDIO_MIN_GAS_PRICE_HEX : result;
+    } catch {
+      return result;
+    }
+  };
+  writableClient.__ordinFeeGuard = true;
+  return client;
+}
 
 export function getReadClient(): GenLayerClient<GenLayerChain> {
   if (!cachedRead) {
@@ -49,11 +69,11 @@ export async function connectWallet(): Promise<string> {
   const address = accounts[0];
   connectedAddress = address;
 
-  cachedWrite = createClient({
+  cachedWrite = applyStudioNetFeeGuard(createClient({
     chain: studionet,
     account: address as `0x${string}`,
     provider: ethereum,
-  });
+  }));
 
   try {
     window.localStorage.setItem(ADDR_STORAGE, address);
@@ -74,11 +94,11 @@ export async function reconnectWallet(): Promise<string | null> {
     });
     if (accounts.length && accounts[0].toLowerCase() === stored.toLowerCase()) {
       connectedAddress = accounts[0];
-      cachedWrite = createClient({
+      cachedWrite = applyStudioNetFeeGuard(createClient({
         chain: studionet,
         account: accounts[0] as `0x${string}`,
         provider: ethereum,
-      });
+      }));
       return accounts[0];
     }
   } catch {}

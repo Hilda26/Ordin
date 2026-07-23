@@ -12,10 +12,15 @@ function chainErrorMessage(e: unknown): string {
   return e instanceof Error ? e.message : typeof e === "string" ? e : String(e);
 }
 
+export function isFeeCapTooLowError(e: unknown): boolean {
+  const raw = chainErrorMessage(e).toLowerCase();
+  return raw.includes("feecap") && raw.includes("below chain minimum");
+}
+
 export function isTransientRpcSubmitError(e: unknown): boolean {
   const raw = chainErrorMessage(e).toLowerCase();
+  if (isFeeCapTooLowError(raw)) return false;
   return (
-    raw.includes("0x107d") ||
     raw.includes("not currently accepting transactions") ||
     raw.includes("pipeline backpressure") ||
     raw.includes("l1_sender_commit")
@@ -37,6 +42,11 @@ export function humanizeChainError(e: unknown): OrdinChainError {
     return new OrdinChainError(
       "config",
       "The Ordin contract address is not recognised on StudioNet. Check NEXT_PUBLIC_ORDIN_CONTRACT_ADDRESS."
+    );
+  if (isFeeCapTooLowError(raw))
+    return new OrdinChainError(
+      "rpc",
+      "StudioNet returned a zero gas price and the wallet sent a fee below the chain minimum. Refresh the page, reconnect the wallet, and retry."
     );
   if (isTransientRpcSubmitError(raw))
     return new OrdinChainError(
