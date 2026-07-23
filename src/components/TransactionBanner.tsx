@@ -8,6 +8,7 @@ const PHASE_TEXT: Record<string, string> = {
   idle: "",
   "awaiting-wallet": "Preparing transaction…",
   submitting: "Submitting to StudioNet…",
+  retrying: "StudioNet is busy; retrying submission...",
   pending: "Pending — validators are processing the transaction.",
   confirmed: "Confirmed on StudioNet.",
   failed: "Transaction failed.",
@@ -26,7 +27,7 @@ export function TransactionBanner({ tx }: { tx: TxProgress | null }) {
       }`}
     >
       <span>
-        {failed ? "✕" : confirmed ? "✓" : "…"} {PHASE_TEXT[tx.phase]}
+        {failed ? "✕" : confirmed ? "✓" : tx.phase === "retrying" ? "↻" : "…"} {PHASE_TEXT[tx.phase]}
       </span>
       {tx.hash ? <ExplorerLink kind="tx" value={tx.hash} label="view transaction" /> : null}
       {tx.error ? <span className="basis-full text-verdict-fail">{tx.error}</span> : null}

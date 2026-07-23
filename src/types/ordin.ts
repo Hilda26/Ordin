@@ -219,6 +219,7 @@ export type TxPhase =
   | "idle"
   | "awaiting-wallet"
   | "submitting"
+  | "retrying"
   | "pending"
   | "confirmed"
   | "failed";

@@ -8,9 +8,22 @@ export class OrdinChainError extends Error {
   }
 }
 
+function chainErrorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : typeof e === "string" ? e : String(e);
+}
+
+export function isTransientRpcSubmitError(e: unknown): boolean {
+  const raw = chainErrorMessage(e).toLowerCase();
+  return (
+    raw.includes("0x107d") ||
+    raw.includes("not currently accepting transactions") ||
+    raw.includes("pipeline backpressure") ||
+    raw.includes("l1_sender_commit")
+  );
+}
+
 export function humanizeChainError(e: unknown): OrdinChainError {
-  const raw =
-    e instanceof Error ? e.message : typeof e === "string" ? e : String(e);
+  const raw = chainErrorMessage(e);
 
   // contract-level rejections carry our deterministic prefixes
   const expected = raw.match(/EXPECTED:\s*([^"\n]+)/);
@@ -24,6 +37,11 @@ export function humanizeChainError(e: unknown): OrdinChainError {
     return new OrdinChainError(
       "config",
       "The Ordin contract address is not recognised on StudioNet. Check NEXT_PUBLIC_ORDIN_CONTRACT_ADDRESS."
+    );
+  if (isTransientRpcSubmitError(raw))
+    return new OrdinChainError(
+      "rpc",
+      "StudioNet is temporarily busy and rejected the transaction before it entered the queue. Wait a few seconds and retry."
     );
   if (raw.includes("Failed to fetch") || raw.includes("fetch failed") || raw.includes("NetworkError"))
     return new OrdinChainError(

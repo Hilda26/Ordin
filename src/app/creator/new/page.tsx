@@ -82,6 +82,7 @@ export default function CreateBountyPage() {
   const [busy, setBusy] = useState(false);
   const [publishToo, setPublishToo] = useState(true);
   const [problem, setProblem] = useState("");
+  const [createdBid, setCreatedBid] = useState<string | null>(null);
 
   // local draft persistence (Supabase drafts sync can layer on top)
   useEffect(() => {
@@ -119,7 +120,18 @@ export default function CreateBountyPage() {
     return "";
   };
 
+  const clearLocalDraft = () => {
+    try {
+      window.localStorage.removeItem(DRAFT_KEY);
+    } catch { /* non-fatal */ }
+  };
+
   const publish = async () => {
+    if (createdBid) {
+      router.push(`/bounties/${createdBid}`);
+      return;
+    }
+
     const v = validate();
     setProblem(v);
     if (v || busy) return;
@@ -159,10 +171,17 @@ export default function CreateBountyPage() {
       );
       const counts = await getCounts();
       const bid = `B${counts.bounties}`;
-      if (publishToo) await openBounty(bid, setTx);
-      try {
-        window.localStorage.removeItem(DRAFT_KEY);
-      } catch { /* non-fatal */ }
+      setCreatedBid(bid);
+      clearLocalDraft();
+      if (publishToo) {
+        try {
+          await openBounty(bid, setTx);
+        } catch (e) {
+          const detail = e instanceof Error ? e.message : "StudioNet rejected the open transaction.";
+          setProblem(`Bounty ${bid} was created as a draft, but StudioNet could not open it yet. ${detail}`);
+          return;
+        }
+      }
       router.push(`/bounties/${bid}`);
     } catch {
       // surfaced by banner
@@ -464,7 +483,13 @@ export default function CreateBountyPage() {
           disabled={busy}
           className="border-2 border-ink bg-ink px-8 py-3 text-paper hover:bg-oxblood hover:border-oxblood disabled:opacity-50"
         >
-          {busy ? "Recording on StudioNet…" : publishToo ? "Create & open bounty" : "Create as draft"}
+          {busy
+            ? "Recording on StudioNet…"
+            : createdBid
+              ? "View created bounty"
+              : publishToo
+                ? "Create & open bounty"
+                : "Create as draft"}
         </button>
         <TransactionBanner tx={tx} />
       </section>

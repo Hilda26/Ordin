@@ -8,7 +8,7 @@ import { TransactionStatus } from "genlayer-js/types";
 import type { CalldataEncodable, TransactionHash } from "genlayer-js/types";
 import { getWriteClient } from "./client";
 import { ORDIN_CONTRACT_ADDRESS } from "./config";
-import { humanizeChainError, OrdinChainError } from "./errors";
+import { humanizeChainError, isTransientRpcSubmitError, OrdinChainError } from "./errors";
 import type { EvidenceRef, ResolverOutcome, TxPhase } from "@/types/ordin";
 
 export interface TxProgress {
@@ -30,6 +30,9 @@ function leaderResult(receipt: unknown): string | undefined {
   return first?.execution_result ?? first?.result;
 }
 
+const SUBMIT_RETRY_DELAYS_MS = [2500, 7500];
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
 async function doWrite(
   functionName: string,
   args: CalldataEncodable[],
@@ -37,17 +40,35 @@ async function doWrite(
 ): Promise<{ hash: string }> {
   const { client } = getWriteClient();
   onProgress?.({ phase: "awaiting-wallet" });
-  let hash: string;
-  try {
-    onProgress?.({ phase: "submitting" });
-    hash = (await client.writeContract({
-      address: ORDIN_CONTRACT_ADDRESS,
-      functionName,
-      args,
-      value: 0n,
-    })) as string;
-  } catch (e) {
-    const err = humanizeChainError(e);
+  let hash: string | undefined;
+  let lastSubmitError: unknown;
+  for (let attempt = 0; attempt <= SUBMIT_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      onProgress?.({ phase: "submitting" });
+      hash = (await client.writeContract({
+        address: ORDIN_CONTRACT_ADDRESS,
+        functionName,
+        args,
+        value: 0n,
+      })) as string;
+      break;
+    } catch (e) {
+      lastSubmitError = e;
+      if (!isTransientRpcSubmitError(e) || attempt === SUBMIT_RETRY_DELAYS_MS.length) {
+        const err = humanizeChainError(e);
+        onProgress?.({ phase: "failed", error: err.message });
+        throw err;
+      }
+      const delay = SUBMIT_RETRY_DELAYS_MS[attempt];
+      onProgress?.({
+        phase: "retrying",
+        error: `StudioNet is busy. Retrying in ${Math.round(delay / 1000)}s...`,
+      });
+      await sleep(delay);
+    }
+  }
+  if (!hash) {
+    const err = humanizeChainError(lastSubmitError);
     onProgress?.({ phase: "failed", error: err.message });
     throw err;
   }
